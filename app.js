@@ -8,11 +8,31 @@ const hbs          = require('hbs');
 const mongoose     = require('mongoose');
 const logger       = require('morgan');
 const path         = require('path');
+const session      =  require('express-session');
+const MongoStore = require('connect-mongo')(session);
 
+//helpers
+hbs.registerHelper('count', function(array){
+  return array.length;
+});
+
+hbs.registerHelper('checkIfFollow', function(id, loggedUser){
+  const elId = loggedUser.following.find(i => i == id.toString());
+  console.log("el logueado: ",loggedUser.following)
+  console.log("el perfil ", new String(id))
+  if(elId) {
+    console.log('following')
+    return "Following"
+  }
+  else {
+    console.log('follow')
+    return "Follow"
+  }
+})
 
 mongoose.Promise = Promise;
 mongoose
-  .connect('mongodb://localhost/proyect2', {useMongoClient: true})
+  .connect(process.env.DB, {useMongoClient: true})
   .then(() => {
     console.log('Connected to Mongo!')
   }).catch(err => {
@@ -49,10 +69,47 @@ app.use(favicon(path.join(__dirname, 'public', 'images', 'favicon.ico')));
 // default value for title local
 app.locals.title = 'Express - Generated with IronGenerator';
 
+//session
+// app.use(session({
+//   secret: 'bliss',
+//   cookie: {maxAge:60000},
+//   store:new MongoStore({
+//     mongooseConnection:mongoose.connection,
+//     ttl:24*60*60
+//   })
+// }));
 
+// app.use(session({
+//   secret: "bliss",
+//   resave: true,
+//   saveUninitialized: true
+// }));
+
+
+app.use(session({
+  store: new MongoStore({
+    mongooseConnection:mongoose.connection,
+    ttl:24*60*60
+  }),
+  secret: 'bliss',
+  saveUninitialized: true,
+  resave: true,
+  // cookie: {
+  //     path: "/",
+  // }
+}));
+
+//passport
+const passport = require('./helpers/passport');
+app.use(passport.initialize());
+app.use(passport.session());
 
 const index = require('./routes/index');
+const auth = require('./routes/auth');
+
+app.use('/', auth);
 app.use('/', index);
+
 
 
 module.exports = app;
